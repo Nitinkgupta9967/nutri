@@ -1,0 +1,8 @@
+# Environment variables
+.env
+
+# Streamlit app file
+streamlit_app.py
+
+# Virtual environment
+venv/
