@@ -205,16 +205,5 @@ POST /diet/recommend-diet
 * AI-based portion size estimation
 * Integration with wearable devices
 
----
 
-## 👨‍💻 Author
 
-Built by **Shashank Gurav**
-
----
-
-## ⭐ If you like this project
-
-Give it a ⭐ on GitHub and share!
-
----
