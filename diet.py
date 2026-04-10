@@ -75,6 +75,7 @@ class Meal(BaseModel):
     carbs: int
     fat: int
     description: str
+    detailed_description: str = ""
     image_prompt: str
     image_url: str = ""
 
@@ -109,8 +110,8 @@ Create a realistic, tasty 7-day weekly diet plan based on the user's cuisine pre
 
 Return ONLY valid JSON in this exact format. No extra text, no markdown, no code blocks.
 
-CRITICAL: Every meal object MUST contain all 8 fields: time, name, calories, protein, carbs, fat, description, image_prompt.
-Missing "carbs" or "fat" from ANY meal is a fatal error.
+CRITICAL: Every meal object MUST contain all 9 fields:
+time, name, calories, protein, carbs, fat, description, detailed_description, image_prompt.
 
 {
   "daily_calories_target": 1800,
@@ -126,6 +127,7 @@ Missing "carbs" or "fat" from ANY meal is a fatal error.
           "carbs": 45,
           "fat": 8,
           "description": "Oats with mustard seeds, curry leaves, mixed veggies",
+          "detailed_description": "1 bowl (200g) masala oats upma made with 50g oats, 100g mixed vegetables (carrot, peas, beans), seasoned with mustard seeds and curry leaves",
           "image_prompt": "masala oats upma bowl, Indian breakfast"
         },
         {
@@ -136,27 +138,8 @@ Missing "carbs" or "fat" from ANY meal is a fatal error.
           "carbs": 72,
           "fat": 10,
           "description": "Yellow dal with cumin and garlic, served with brown rice",
+          "detailed_description": "150g yellow dal tadka + 150g cooked brown rice (approx 1 bowl each)",
           "image_prompt": "dal tadka brown rice, Indian lunch"
-        },
-        {
-          "time": "04:00 PM SNACK",
-          "name": "Roasted Chana",
-          "calories": 150,
-          "protein": 8,
-          "carbs": 22,
-          "fat": 3,
-          "description": "Crunchy roasted chickpeas with chaat masala",
-          "image_prompt": "roasted chana bowl, healthy snack"
-        },
-        {
-          "time": "08:00 PM DINNER",
-          "name": "Palak Paneer with 2 Rotis",
-          "calories": 420,
-          "protein": 22,
-          "carbs": 38,
-          "fat": 15,
-          "description": "Spinach curry with paneer and whole wheat rotis",
-          "image_prompt": "palak paneer rotis, Indian dinner"
         }
       ],
       "total_calories": 1400,
@@ -166,33 +149,29 @@ Missing "carbs" or "fat" from ANY meal is a fatal error.
     }
   ],
   "smart_swaps": [
-    {"instead_of": "White Rice", "swap_with": "Brown Rice", "reason": "Lower glycemic index, more fiber"},
-    {"instead_of": "Maida Roti", "swap_with": "Whole Wheat Roti", "reason": "Higher fiber, stabilizes blood sugar"},
-    {"instead_of": "Full Fat Milk", "swap_with": "Skimmed Milk", "reason": "Lower saturated fat, same protein"},
-    {"instead_of": "Fruit Juice", "swap_with": "Whole Fruit", "reason": "Fiber slows sugar absorption"},
-    {"instead_of": "Fried Snacks", "swap_with": "Roasted Alternatives", "reason": "Lower in calories and fat"}
+    {"instead_of": "White Rice", "swap_with": "Brown Rice", "reason": "Lower glycemic index, more fiber"}
   ],
   "foods_to_avoid": [
-    "Fried snacks like samosa, pakora, and vada",
-    "Sugary drinks like cola, packaged juices, and energy drinks",
-    "White bread and maida-based products like pav and naan",
-    "Processed foods like chips, biscuits, and instant noodles",
-    "High-sugar sweets like gulab jamun, jalebi, and rasgulla",
+    "Fried snacks like samosa, pakora",
+    "Sugary drinks and packaged juices",
+    "White bread and maida products",
+    "Processed foods and chips",
+    "High-sugar sweets like gulab jamun",
     "Alcohol and carbonated beverages"
   ],
-  "ai_notes": "Plan tailored for your goal. Stay hydrated with 2.5-3L water daily."
+  "ai_notes": "Plan tailored for your goal. Stay hydrated with 3L water daily."
 }
 
 STRICT RULES:
-- MANDATORY meal fields (all 8, no exceptions): time, name, calories, protein, carbs, fat, description, image_prompt.
+- Every meal must have all 9 fields. "detailed_description" is mandatory.
+- "description": Keep it short (max 12 words) — general overview.
+- "detailed_description": Must clearly mention exact quantities (grams, ml, number of pieces, bowls, cups etc.). Make it practical and easy to follow.
 - Each day must have exactly 4 meals: Breakfast, Lunch, Evening Snack, Dinner.
-- Every day must include total_calories, total_protein, total_carbs, total_fat as integers.
-- Meals MUST match cuisine_preference (South Indian: idli/dosa/sambar; North Indian: roti/dal/sabzi; Continental: salads/wraps/soups).
-- Strictly respect meal_preference (Veg / Non-Veg / Eggitarian / Vegan).
-- smart_swaps: exactly 5 items. foods_to_avoid: exactly 6 items.
-- description: max 12 words. image_prompt: max 8 words.
-- All numeric values must be integers.
-- No trailing commas. No markdown. Raw JSON only.
+- smart_swaps: exactly 5 items.
+- foods_to_avoid: exactly 6 items.
+- All numbers must be integers.
+- Respect meal_preference and cuisine_preference strictly.
+- Return raw JSON only.
 """
 
 
@@ -282,6 +261,36 @@ async def generate_meal_image(meal_name: str, base_prompt: str) -> str:
 
 
 # ── Robust JSON Cleaner ───────────────────────────────────────────────────────
+# def clean_and_parse_diet_json(raw: str) -> dict:
+#     """Strip noise from the model's response and return a parsed dict."""
+#     text = raw.strip()
+
+#     if text.startswith("```"):
+#         match = re.search(r"```(?:json)?\s*([\s\S]*?)\s*```", text, re.DOTALL)
+#         if match:
+#             text = match.group(1).strip()
+
+#     json_match = re.search(r"(\{[\s\S]*\})", text)
+#     if json_match:
+#         text = json_match.group(1)
+
+#     text = re.sub(r",\s*([}\]])", r"\1", text)
+#     text = re.sub(r'"\s*,\s*"', '", "', text)
+#     text = re.sub(r'(\}\s*)\n\s*\{', r'\1,\n  {', text)
+
+#     try:
+#         return json.loads(text)
+#     except json.JSONDecodeError as exc:
+#         log.error(f"Diet JSON parse failed: {exc}\nLast 300 chars:\n{text[-300:]}")
+#         raise HTTPException(
+#             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+#             detail=_error(
+#                 message="The AI model returned malformed JSON for the diet plan.",
+#                 error_code="MALFORMED_AI_RESPONSE",
+#                 details=str(exc),
+#                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+#             ),
+#         )
 def clean_and_parse_diet_json(raw: str) -> dict:
     """Strip noise from the model's response and return a parsed dict."""
     text = raw.strip()
@@ -296,20 +305,17 @@ def clean_and_parse_diet_json(raw: str) -> dict:
         text = json_match.group(1)
 
     text = re.sub(r",\s*([}\]])", r"\1", text)
-    text = re.sub(r'"\s*,\s*"', '", "', text)
-    text = re.sub(r'(\}\s*)\n\s*\{', r'\1,\n  {', text)
 
     try:
         return json.loads(text)
     except json.JSONDecodeError as exc:
-        log.error(f"Diet JSON parse failed: {exc}\nLast 300 chars:\n{text[-300:]}")
+        log.error(f"Diet JSON parse failed: {exc}")
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail=_error(
                 message="The AI model returned malformed JSON for the diet plan.",
                 error_code="MALFORMED_AI_RESPONSE",
                 details=str(exc),
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             ),
         )
 
