@@ -6,3 +6,5 @@ streamlit_app.py
 
 # Virtual environment
 venv/
+
+meal_images/
